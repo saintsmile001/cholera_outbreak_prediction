@@ -6,24 +6,43 @@ Uses DATABASE_URL from settings — works with both SQLite (local)
 and PostgreSQL (Railway) via the same interface.
 """
 
+from __future__ import annotations
+
+from typing import Any
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
+from app.core.logger import logger
 
 
 # ── Engine ───────────────────────────────────────────────────────────────
 
-# SQLite requires `check_same_thread=False` for FastAPI's threaded model.
-connect_args = {}
+connect_args: dict[str, Any] = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    connect_args=connect_args,
-    echo=settings.DEBUG,
-)
+
+def _build_engine() -> Any:
+    """Create the SQLAlchemy engine, falling back to SQLite when needed."""
+    try:
+        return create_engine(
+            settings.DATABASE_URL,
+            connect_args=connect_args,
+            echo=settings.DEBUG,
+        )
+    except Exception as exc:
+        logger.warning("Database engine creation failed (%s); falling back to SQLite", exc)
+        fallback_url = "sqlite:///./cholera.db"
+        return create_engine(
+            fallback_url,
+            connect_args={"check_same_thread": False},
+            echo=settings.DEBUG,
+        )
+
+
+engine = _build_engine()
 
 # ── Session factory ──────────────────────────────────────────────────────
 
