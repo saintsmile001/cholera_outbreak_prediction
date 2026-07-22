@@ -142,8 +142,8 @@ def get_high_risk_lgas(month: int = _DEFAULT_MONTH) -> HighRiskResponse:
         pred = generate_prediction(req)
         if pred.risk_level in (RISK_HIGH, RISK_MODERATE):
             key_factors = [
-                f["factor"]
-                for f in pred.contributing_factors[:3]  # top 3 factors
+                factor.factor
+                for factor in pred.contributing_factors[:3]  # top 3 factors
             ] if pred.contributing_factors else []
             high_risk.append(
                 HighRiskLGA(
