@@ -40,7 +40,15 @@ class Settings(BaseSettings):
 
     # ── API ──────────────────────────────────────────────────────────────
     API_PREFIX: str = "/api/v1"
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "http://0.0.0.0:3000",
+        "http://0.0.0.0:5173",
+    ]
+    CORS_ORIGIN_REGEX: str | None = None
 
     # ── ML Model Paths ───────────────────────────────────────────────────
     MODEL_PATH: str = "realdata/cholera_outbreak_model.pkl"

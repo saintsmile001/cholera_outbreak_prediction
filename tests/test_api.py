@@ -74,6 +74,13 @@ class TestPrediction:
         response = client.post("/api/v1/predict", json=VALID_PAYLOAD)
         assert response.status_code == 200
 
+    def test_predict_without_conflict_score(self):
+        payload = {k: v for k, v in VALID_PAYLOAD.items() if k != "conflict_score"}
+        response = client.post("/api/v1/predict", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert "probability" in data
+
     def test_predict_returns_risk_level(self):
         data = client.post("/api/v1/predict", json=VALID_PAYLOAD).json()
         assert "risk_level" in data

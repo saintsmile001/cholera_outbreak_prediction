@@ -47,10 +47,10 @@ class PredictionRequest(BaseModel):
         examples=[0.2],
     )
     conflict_score: float = Field(
-        ...,
+        default=0.0,
         ge=0,
         le=1,
-        description="Conflict/insurgency intensity from 0 (peaceful) to 1 (severe).",
+        description="Conflict/insurgency intensity from 0 (peaceful) to 1 (severe). Optional (defaults to 0.0 if omitted).",
         examples=[0.8],
     )
     idp_camp: bool = Field(
