@@ -1,0 +1,71 @@
+"""
+Centralized application configuration.
+
+Loads settings from environment variables and .env file using Pydantic Settings.
+All configuration values are typed and validated at startup.
+"""
+
+from pathlib import Path
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Resolve the backend directory (two levels up from this file)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables / .env file."""
+
+    model_config = SettingsConfigDict(
+        env_file=str(BASE_DIR / ".env"),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ── Application ──────────────────────────────────────────────────────
+    APP_NAME: str = "AI-Powered Cholera Outbreak Prediction API"
+    APP_VERSION: str = "1.0.0"
+    APP_DESCRIPTION: str = (
+        "Backend API for predicting cholera outbreak risk in Borno State, Nigeria. "
+        "Uses environmental, demographic, and conflict indicators to estimate outbreak probability."
+    )
+    DEBUG: bool = True
+
+    # ── Server ───────────────────────────────────────────────────────────
+    HOST: str = "127.0.0.1"
+    PORT: int = 8000
+
+    # ── API ──────────────────────────────────────────────────────────────
+    API_PREFIX: str = "/api/v1"
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"]
+
+    # ── ML Model Paths ───────────────────────────────────────────────────
+    MODEL_PATH: str = "models/cholera_model.joblib"
+    PREPROCESSOR_PATH: str = "models/preprocessor.joblib"
+
+    # ── Risk Thresholds ──────────────────────────────────────────────────
+    HIGH_RISK_THRESHOLD: float = 0.7
+    MODERATE_RISK_THRESHOLD: float = 0.4
+
+    @property
+    def abs_model_path(self) -> Path:
+        """Return the absolute path to the trained model file."""
+        return BASE_DIR / self.MODEL_PATH
+
+    @property
+    def abs_preprocessor_path(self) -> Path:
+        """Return the absolute path to the preprocessing pipeline file."""
+        return BASE_DIR / self.PREPROCESSOR_PATH
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Return a cached singleton of the application settings."""
+    return Settings()
+
+
+# Convenience alias used throughout the application
+settings = get_settings()
