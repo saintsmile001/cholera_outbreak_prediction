@@ -71,6 +71,12 @@ def dispatch_prediction_email(
 
     summary_dicts = [item.model_dump() for item in request.summary]
 
+    if not request.recipient:
+        return {
+            "success": False,
+            "message": "Recipient email is required.",
+        }
+
     background_tasks.add_task(
         _send_email_task,
         recipient=str(request.recipient),
