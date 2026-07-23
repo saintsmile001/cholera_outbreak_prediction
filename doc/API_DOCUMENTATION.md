@@ -120,7 +120,99 @@ Content-Type: application/json
 
 ---
 
+## 2.1 Dataset-Based Risk Prediction API
+
+### `GET /api/v1/predict/dataset`
+Runs outbreak risk predictions across records in the dataset (`Borno_Cholera_Hackathon_2017_2026.csv`). Groups and returns predictions organized by Local Government Area (LGA).
+
+#### Query Parameters
+| Parameter | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `location` | `string` | No | `null` | Filter predictions by Local Government Area (e.g., `"Maiduguri"`, `"Bama"`) |
+| `month` | `integer` | No | `null` | Filter predictions by month (1 to 12) |
+| `year` | `integer` | No | `null` | Filter predictions by year (e.g. 2024, 2025) |
+| `limit` | `integer` | No | `200` | Maximum dataset records to evaluate (1 to 2000) |
+
+#### Example Request
+```http
+GET /api/v1/predict/dataset?location=Maiduguri&month=8&limit=50
+```
+
+#### Response Body (`DatasetPredictionResponse`) — Status `200 OK`
+```json
+{
+  "dataset_name": "Borno_Cholera_Hackathon_2017_2026.csv",
+  "total_records_processed": 10,
+  "lgas_present": [
+    "Maiduguri"
+  ],
+  "summary_by_lga": [
+    {
+      "location": "Maiduguri",
+      "total_records": 10,
+      "average_probability": 0.735,
+      "max_probability": 0.812,
+      "highest_risk_level": "high",
+      "predictions": [
+        {
+          "year": 2024,
+          "week": 32,
+          "month": 8,
+          "location": "Maiduguri",
+          "rainfall": 145.0,
+          "population_density": 5200.0,
+          "wash_score": 0.25,
+          "risk_level": "high",
+          "probability": 0.765,
+          "confidence": 0.895,
+          "prediction_method": "rule-based",
+          "contributing_factors": [
+            { "factor": "Rainfall intensity", "value": 0.3625, "impact": "high" },
+            { "factor": "Poor sanitation (WASH deficit)", "value": 0.75, "impact": "high" }
+          ],
+          "explanation": "High risk of cholera outbreak in Maiduguri..."
+        }
+      ]
+    }
+  ],
+  "all_predictions": [...]
+}
+```
+
+---
+
+### `GET /api/v1/predict/dataset/lga/{lga_name}`
+Retrieves dataset-driven risk predictions specifically for a named Local Government Area (LGA) present in the dataset.
+
+#### Example Request
+```http
+GET /api/v1/predict/dataset/lga/Bama?month=8
+```
+
+---
+
+### `POST /api/v1/predict/dataset/upload`
+Uploads a custom CSV dataset file to calculate risk predictions using the model, returning predictions organized per Local Government Area present in the uploaded file.
+
+#### Example Request (Multipart Form Data)
+```http
+POST /api/v1/predict/dataset/upload
+Content-Type: multipart/form-data; boundary=---------------------------974767299852498929531610575
+
+-----------------------------974767299852498929531610575
+Content-Disposition: form-data; name="file"; filename="my_lga_data.csv"
+Content-Type: text/csv
+
+Year,Week,Month,LGA,Rainfall_mm,Population_Density,Safe_Water_pct,IDP_Population,Conflict_Score
+2025,32,8,Maiduguri,150.0,5000,20,10000,0.8
+2025,32,8,Bama,190.0,3500,15,22000,0.9
+-----------------------------974767299852498929531610575--
+```
+
+---
+
 ## 3. Analytics & Dashboard API
+
 
 ### `GET /api/v1/analytics/summary`
 Returns high-level aggregate risk metrics across all 27 Borno State LGAs for a given month. Ideal for top-level dashboard KPI cards.
