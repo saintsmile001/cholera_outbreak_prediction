@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     JWT_RESET_TOKEN_EXPIRE_MINUTES: int = 15
 
+    # ── SMTP / Email ─────────────────────────────────────────────────────
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 465
+    SMTP_USER: str = "choleraguard@gmail.com"
+    SMTP_PASSWORD: str = ""
+    SENDER_EMAIL: str = "choleraguard@gmail.com"
+    SENDER_NAME: str = "CholeraGuard AI Surveillance System"
+
     @property
     def abs_model_path(self) -> Path:
         """Return the absolute path to the trained model file."""
