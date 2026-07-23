@@ -47,6 +47,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://0.0.0.0:3000",
         "http://0.0.0.0:5173",
+        "https://cholera-prediction.vercel.app"
     ]
     CORS_ORIGIN_REGEX: str | None = None
 
