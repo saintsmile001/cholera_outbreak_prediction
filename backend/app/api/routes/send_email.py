@@ -5,13 +5,17 @@ POST /api/v1/predict/send-email
 Sends a structured cholera outbreak prediction report email to the user.
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 from app.services.email_service import send_prediction_email
 
 router = APIRouter(prefix="/api/v1", tags=["email"])
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 class LGASummaryItem(BaseModel):
@@ -23,7 +27,7 @@ class LGASummaryItem(BaseModel):
 
 
 class SendEmailRequest(BaseModel):
-    recipient: EmailStr
+    recipient: str  # plain str to avoid strict EmailStr validation on Railway
     dataset_name: str = "Borno_Cholera_Dataset.csv"
     summary: list[LGASummaryItem] = []
     from_name: str = "CholeraGuard AI Surveillance System"
@@ -37,14 +41,18 @@ class SendEmailRequest(BaseModel):
         "to the specified recipient email address via Gmail SMTP."
     ),
 )
-def dispatch_prediction_email(request: SendEmailRequest) -> dict[str, Any]:
-    """Send a structured LGA risk prediction report to the user's email."""
+async def dispatch_prediction_email(request: SendEmailRequest) -> dict[str, Any]:
+    """Send a structured LGA risk prediction report to the user's email (non-blocking)."""
     try:
         summary_dicts = [item.model_dump() for item in request.summary]
-        result = send_prediction_email(
-            recipient_email=request.recipient,
-            dataset_name=request.dataset_name,
-            summary_by_lga=summary_dicts,
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            _executor,
+            lambda: send_prediction_email(
+                recipient_email=str(request.recipient),
+                dataset_name=request.dataset_name,
+                summary_by_lga=summary_dicts,
+            ),
         )
         if not result.get("success"):
             raise HTTPException(status_code=500, detail=result.get("message", "Email dispatch failed"))

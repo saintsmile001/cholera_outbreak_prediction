@@ -249,9 +249,9 @@ def send_prediction_email(
     msg.attach(MIMEText(html_body, "html"))
 
     context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context) as server:
+    with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=30) as server:
         server.login(sender_email, smtp_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.sendmail(sender_email, [recipient_email], msg.as_string())
 
     return {
         "success": True,
