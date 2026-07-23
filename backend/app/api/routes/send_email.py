@@ -2,21 +2,19 @@
 Email dispatch route.
 
 POST /api/v1/predict/send-email
-Sends a structured cholera outbreak prediction report email to the user.
+Returns 202 immediately and sends the email in a background task so the
+frontend never times out waiting for the Gmail SMTP handshake.
 """
 
-import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 
 from app.services.email_service import send_prediction_email
 
 router = APIRouter(prefix="/api/v1", tags=["email"])
-_executor = ThreadPoolExecutor(max_workers=4)
 logger = logging.getLogger(__name__)
 
 
@@ -29,57 +27,60 @@ class LGASummaryItem(BaseModel):
 
 
 class SendEmailRequest(BaseModel):
-    recipient: str  # plain str avoids strict EmailStr validation issues on Railway
+    recipient: str
     dataset_name: str = "Borno_Cholera_Dataset.csv"
     summary: list[LGASummaryItem] = []
     from_name: str = "CholeraGuard AI Surveillance System"
 
 
+def _send_email_task(recipient: str, dataset_name: str, summary_dicts: list[dict]) -> None:
+    """Background task: runs after HTTP response is already sent to client."""
+    logger.info("[BG-EMAIL] Background email task started for %s", recipient)
+    try:
+        result = send_prediction_email(
+            recipient_email=recipient,
+            dataset_name=dataset_name,
+            summary_by_lga=summary_dicts,
+        )
+        if result.get("success"):
+            logger.info("[BG-EMAIL] ✓ Email delivered to %s", recipient)
+        else:
+            logger.error("[BG-EMAIL] ✗ Email failed: %s", result.get("message"))
+    except Exception as exc:
+        logger.exception("[BG-EMAIL] Unhandled SMTP error: %s", str(exc))
+
+
 @router.post(
     "/predict/send-email",
-    summary="Send structured prediction report email",
+    status_code=202,
+    summary="Send structured prediction report email (fire-and-forget)",
     description=(
-        "Dispatches a structured cholera outbreak risk prediction report email "
-        "to the specified recipient email address via Gmail SMTP."
+        "Accepts the email request and returns 202 immediately. "
+        "Email is dispatched via Gmail SMTP in a background task."
     ),
 )
-async def dispatch_prediction_email(request: SendEmailRequest) -> dict[str, Any]:
-    """Send a structured LGA risk prediction report to the user's email (non-blocking)."""
-    logger.info("[ROUTE] POST /predict/send-email received")
-    logger.info("[ROUTE] Recipient  : %s", request.recipient)
-    logger.info("[ROUTE] Dataset    : %s", request.dataset_name)
-    logger.info("[ROUTE] LGA count  : %d", len(request.summary))
-    logger.info("[ROUTE] LGAs       : %s", [s.location for s in request.summary])
+def dispatch_prediction_email(
+    request: SendEmailRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
+    """Queue the SMTP email task and return 202 immediately — no timeout risk."""
+    logger.info("[ROUTE] POST /predict/send-email — queuing background email task")
+    logger.info("[ROUTE] Recipient : %s", request.recipient)
+    logger.info("[ROUTE] Dataset   : %s", request.dataset_name)
+    logger.info("[ROUTE] LGA count : %d", len(request.summary))
 
-    try:
-        summary_dicts = [item.model_dump() for item in request.summary]
-        logger.info("[ROUTE] Submitting SMTP task to thread executor...")
+    summary_dicts = [item.model_dump() for item in request.summary]
 
-        loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            _executor,
-            lambda: send_prediction_email(
-                recipient_email=str(request.recipient),
-                dataset_name=request.dataset_name,
-                summary_by_lga=summary_dicts,
-            ),
-        )
+    background_tasks.add_task(
+        _send_email_task,
+        recipient=str(request.recipient),
+        dataset_name=request.dataset_name,
+        summary_dicts=summary_dicts,
+    )
 
-        logger.info("[ROUTE] Email service returned: %s", result)
-
-        if not result.get("success"):
-            logger.error("[ROUTE] Email dispatch reported failure: %s", result.get("message"))
-            raise HTTPException(
-                status_code=500,
-                detail=result.get("message", "Email dispatch failed"),
-            )
-        return result
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("[ROUTE] Unhandled exception during email dispatch: %s", str(exc))
-        raise HTTPException(
-            status_code=500,
-            detail=f"SMTP email dispatch error: {str(exc)}",
-        )
+    logger.info("[ROUTE] Email task queued — returning 202 to client immediately")
+    return {
+        "success": True,
+        "simulated": False,
+        "message": f"Prediction report is being dispatched to {request.recipient} via choleraguard@gmail.com",
+    }
