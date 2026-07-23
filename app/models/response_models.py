@@ -99,6 +99,45 @@ class DatasetsResponse(BaseModel):
     datasets: list[DatasetInfo]
 
 
+# ── Dataset Predictions ──────────────────────────────────────────────────
+
+class DatasetRecordPrediction(BaseModel):
+    """A prediction for a single row / observation in a dataset."""
+    year: int | None = None
+    week: int | None = None
+    month: int
+    location: str = Field(..., description="Local Government Area (LGA)")
+    rainfall: float
+    population_density: float
+    wash_score: float
+    risk_level: str
+    probability: float
+    confidence: float
+    prediction_method: str
+    contributing_factors: list[ContributingFactor] = Field(default_factory=list)
+    explanation: str | None = None
+
+
+class LGADatasetSummary(BaseModel):
+    """Summary of dataset predictions for a specific Local Government Area (LGA)."""
+    location: str
+    total_records: int
+    average_probability: float
+    max_probability: float
+    highest_risk_level: str
+    predictions: list[DatasetRecordPrediction] = Field(default_factory=list)
+
+
+class DatasetPredictionResponse(BaseModel):
+    """Overall response for dataset-based predictions across Local Government Areas."""
+    dataset_name: str
+    total_records_processed: int
+    lgas_present: list[str]
+    summary_by_lga: list[LGADatasetSummary] = Field(default_factory=list)
+    all_predictions: list[DatasetRecordPrediction] = Field(default_factory=list)
+
+
+
 # ── Generic ──────────────────────────────────────────────────────────────
 
 class ErrorResponse(BaseModel):
