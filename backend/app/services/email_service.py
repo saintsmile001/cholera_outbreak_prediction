@@ -5,6 +5,7 @@ Uses Gmail SMTP with App Password authentication.
 Sender: choleraguard@gmail.com
 """
 
+import logging
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
@@ -12,6 +13,8 @@ from email.mime.text import MIMEText
 from typing import Any
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def build_email_html(
@@ -234,12 +237,23 @@ def send_prediction_email(
     smtp_port = settings.SMTP_PORT
     smtp_password = settings.SMTP_PASSWORD
 
+    logger.info("[EMAIL] === Prediction Email Dispatch Started ===")
+    logger.info("[EMAIL] Recipient     : %s", recipient_email)
+    logger.info("[EMAIL] Dataset       : %s", dataset_name)
+    logger.info("[EMAIL] LGAs in report: %d", len(summary_by_lga))
+    logger.info("[EMAIL] SMTP Host     : %s", smtp_host)
+    logger.info("[EMAIL] SMTP Port     : %s", smtp_port)
+    logger.info("[EMAIL] SMTP User     : %s", sender_email)
+    logger.info("[EMAIL] Password set  : %s", "YES" if smtp_password else "NO — SMTP_PASSWORD missing!")
+
     if not smtp_password:
+        logger.error("[EMAIL] ABORT — SMTP_PASSWORD is empty. Check Railway environment variables.")
         return {
             "success": False,
-            "message": "SMTP_PASSWORD not configured in backend .env",
+            "message": "SMTP_PASSWORD not configured. Check Railway environment variables.",
         }
 
+    logger.info("[EMAIL] Building HTML email body...")
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"Cholera Outbreak Risk Prediction Report — {dataset_name}"
     msg["From"] = f"{sender_name} <{sender_email}>"
@@ -247,12 +261,33 @@ def send_prediction_email(
 
     html_body = build_email_html(recipient_email, dataset_name, summary_by_lga)
     msg.attach(MIMEText(html_body, "html"))
+    logger.info("[EMAIL] Email body built successfully (%d chars)", len(html_body))
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=30) as server:
-        server.login(sender_email, smtp_password)
-        server.sendmail(sender_email, [recipient_email], msg.as_string())
+    try:
+        logger.info("[EMAIL] Connecting to SMTP server %s:%s (SSL)...", smtp_host, smtp_port)
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=30) as server:
+            logger.info("[EMAIL] SMTP connection established. Authenticating...")
+            server.login(sender_email, smtp_password)
+            logger.info("[EMAIL] Authentication successful. Sending email...")
+            server.sendmail(sender_email, [recipient_email], msg.as_string())
+            logger.info("[EMAIL] Email sent successfully to %s", recipient_email)
+    except smtplib.SMTPAuthenticationError as auth_err:
+        logger.error("[EMAIL] SMTP Authentication FAILED: %s", str(auth_err))
+        logger.error("[EMAIL] Hint: Ensure SMTP_PASSWORD is the Gmail App Password (not your Gmail login password).")
+        raise
+    except smtplib.SMTPConnectError as conn_err:
+        logger.error("[EMAIL] SMTP Connection FAILED to %s:%s — %s", smtp_host, smtp_port, str(conn_err))
+        raise
+    except smtplib.SMTPException as smtp_err:
+        logger.error("[EMAIL] SMTP Error: %s", str(smtp_err))
+        raise
+    except OSError as os_err:
+        logger.error("[EMAIL] Network/OS Error during SMTP: %s", str(os_err))
+        logger.error("[EMAIL] Hint: Railway may block outbound port 465. Try port 587 with STARTTLS.")
+        raise
 
+    logger.info("[EMAIL] === Email Dispatch Complete ===")
     return {
         "success": True,
         "message": f"Prediction report dispatched to {recipient_email} from {sender_email}",
