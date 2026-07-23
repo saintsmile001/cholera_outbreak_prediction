@@ -11,8 +11,8 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# Resolve the backend directory (two levels up from this file)
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Resolve the workspace root (the .env file lives at the repository root)
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):

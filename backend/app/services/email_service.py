@@ -264,14 +264,25 @@ def send_prediction_email(
     logger.info("[EMAIL] Email body built successfully (%d chars)", len(html_body))
 
     try:
-        logger.info("[EMAIL] Connecting to SMTP server %s:%s (SSL)...", smtp_host, smtp_port)
+        logger.info("[EMAIL] Connecting to SMTP server %s:%s...", smtp_host, smtp_port)
         context = ssl.create_default_context()
-        with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=30) as server:
-            logger.info("[EMAIL] SMTP connection established. Authenticating...")
-            server.login(sender_email, smtp_password)
-            logger.info("[EMAIL] Authentication successful. Sending email...")
-            server.sendmail(sender_email, [recipient_email], msg.as_string())
-            logger.info("[EMAIL] Email sent successfully to %s", recipient_email)
+
+        if int(smtp_port) == 587:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as server:
+                logger.info("[EMAIL] SMTP connection established. Starting TLS...")
+                server.starttls(context=context)
+                logger.info("[EMAIL] Authenticating...")
+                server.login(sender_email, smtp_password)
+                logger.info("[EMAIL] Authentication successful. Sending email...")
+                server.sendmail(sender_email, [recipient_email], msg.as_string())
+                logger.info("[EMAIL] Email sent successfully to %s", recipient_email)
+        else:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=30) as server:
+                logger.info("[EMAIL] SMTP connection established. Authenticating...")
+                server.login(sender_email, smtp_password)
+                logger.info("[EMAIL] Authentication successful. Sending email...")
+                server.sendmail(sender_email, [recipient_email], msg.as_string())
+                logger.info("[EMAIL] Email sent successfully to %s", recipient_email)
     except smtplib.SMTPAuthenticationError as auth_err:
         logger.error("[EMAIL] SMTP Authentication FAILED: %s", str(auth_err))
         logger.error("[EMAIL] Hint: Ensure SMTP_PASSWORD is the Gmail App Password (not your Gmail login password).")
